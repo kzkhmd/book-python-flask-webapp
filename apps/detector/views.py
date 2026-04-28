@@ -8,7 +8,7 @@ from apps.app import db
 from apps.crud.models import User
 from apps.detector.forms import ImageUploadForm, DetectorForm, DeleteForm
 from apps.detector.models import UserImage, UserImageTag
-from flask import Blueprint, render_template, current_app, send_from_directory, redirect, url_for, flash
+from flask import Blueprint, render_template, current_app, send_from_directory, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 from pathlib import Path
 from PIL import Image
@@ -52,6 +52,51 @@ def index():
 @dt.route("/images/<path:filename>")
 def image_file(filename):
     return send_from_directory(current_app.config["UPLOAD_FOLDER"], filename)
+
+@dt.route("/images/search", methods=["GET"])
+def search():
+    user_images = db.session.query(User, UserImage).join(UserImage, User.id == UserImage.user_id)
+    search_text = request.args.get("search")
+    user_image_tag_dict = {}
+    filtered_user_images = []
+
+    for user_image in user_images:
+        if not search_text:
+            user_image_tags = (
+                db.session.query(UserImageTag)
+                .filter(UserImageTag.user_image_id == user_image.UserImage.id)
+                .all()
+            )
+        else:
+            user_image_tags = (
+                db.session.query(UserImageTag)
+                .filter(UserImageTag.user_image_id == user_image.UserImage.id)
+                .filter(UserImageTag.tag_name.like(f"%{search_text}%"))
+                .all()
+            )
+
+            if not user_image_tags:
+                continue
+
+            user_image_tags = (
+                db.session.query(UserImageTag)
+                .filter(UserImageTag.user_image_id == user_image.UserImage.id)
+                .all()
+            )
+        
+        user_image_tag_dict[user_image.UserImage.id] = user_image_tags
+        filtered_user_images.append(user_image)
+    
+    delete_form = DeleteForm()
+    detector_form = DetectorForm()
+
+    return render_template(
+        "detector/index.html",
+        user_images=filtered_user_images,
+        user_image_tag_dict=user_image_tag_dict,
+        detector_form=detector_form,
+        delete_form=delete_form
+    )
 
 @dt.route("/upload", methods=["GET", "POST"])
 @login_required
