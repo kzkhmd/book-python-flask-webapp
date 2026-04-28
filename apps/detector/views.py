@@ -22,6 +22,7 @@ dt = Blueprint(
 
 @dt.route("/")
 def index():
+    raise Exception("テストエラー")
     user_images = (
         db.session.query(User, UserImage)
         .join(UserImage)
